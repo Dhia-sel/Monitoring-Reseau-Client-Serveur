@@ -70,7 +70,7 @@ Configuration par défaut :
 
 ### 2.2 Dashboard web (extension optionnelle)
 
-Dans un second terminal, après avoir activé le venv :
+Après activation du venv :
 
 ```bash
 python flask_api.py
@@ -78,7 +78,12 @@ python flask_api.py
 
 Accès : `http://127.0.0.1:8000`
 
-> ⚠️ Le serveur `server.py` doit être démarré **avant** `flask_api.py`.
+Par défaut, `flask_api.py` démarre automatiquement `server.py` en arrière-plan si rien n'écoute déjà sur `127.0.0.1:5051`.
+
+En pratique, vous avez 2 modes :
+
+- **Mode simple (recommandé)** : lancer uniquement `python flask_api.py`, puis lancer les clients.
+- **Mode manuel** : lancer `python server.py` séparément, puis `python flask_api.py --no-monitor`.
 
 ### 2.3 Démarrer un agent
 
@@ -98,21 +103,15 @@ Ou utiliser le client simplifié avec métriques simulées (aléatoires) :
 python client_simple.py
 ```
 
-### 2.4 Exemple de séquence complète
+### 2.4 Exemple de séquence complète (mode simple recommandé)
 
-**Terminal 1 — Serveur :**
-
-```bash
-python server.py
-```
-
-**Terminal 2 — Dashboard :**
+**Terminal 1 — Dashboard + serveur auto-démarré :**
 
 ```bash
 python flask_api.py
 ```
 
-**Terminal 3 — Agent 1 :**
+**Terminal 2 — Agent 1 :**
 
 ```bash
 python client.py
@@ -121,13 +120,18 @@ python client.py
 # → Enable attack simulation? N
 ```
 
-**Terminal 4 — Agent 2 :**
+**Terminal 3 — Agent 2 :**
 
 ```bash
 python client_simple.py
 ```
 
 Ouvrir `http://127.0.0.1:8000` pour voir les métriques en temps réel.
+
+> Si vous préférez séparer les processus :
+>
+> 1. `python server.py`
+> 2. `python flask_api.py --no-monitor`
 
 ---
 
