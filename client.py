@@ -17,7 +17,6 @@ SEND_HEALTH_METADATA = True
 
 
 def get_system_metrics():
-    """Collect CPU and RAM usage metrics using only standard library tools."""
     try:
         cpu_pct = get_cpu_usage_pct()
         ram_mb = get_used_memory_mb()
@@ -28,7 +27,6 @@ def get_system_metrics():
 
 
 def get_cpu_usage_pct():
-    """Return approximate system CPU usage percentage across platforms."""
     system_name = platform.system()
 
     if system_name == 'Windows':
@@ -44,7 +42,6 @@ def get_cpu_usage_pct():
 
 
 def get_cpu_windows():
-    """Read global CPU usage on Windows via typeperf."""
     try:
         result = subprocess.run(
             ['typeperf', r'\Processor(_Total)\% Processor Time', '-sc', '1'],
@@ -64,7 +61,6 @@ def get_cpu_windows():
 
 
 def get_used_memory_mb():
-    """Return used RAM in MB using platform-specific standard-library methods."""
     system_name = platform.system()
     if system_name == 'Windows':
         return get_used_memory_mb_windows()
@@ -76,7 +72,6 @@ def get_used_memory_mb():
 
 
 def get_used_memory_mb_windows():
-    """Get used memory on Windows via GlobalMemoryStatusEx."""
 
     class MEMORYSTATUSEX(ctypes.Structure):
         _fields_ = [
@@ -100,7 +95,6 @@ def get_used_memory_mb_windows():
 
 
 def get_used_memory_mb_linux():
-    """Get used memory on Linux via /proc/meminfo."""
     total_kb = None
     available_kb = None
     with open('/proc/meminfo', 'r', encoding='utf-8') as meminfo:
@@ -118,7 +112,6 @@ def get_used_memory_mb_linux():
 
 
 def get_used_memory_mb_darwin():
-    """Get used memory on macOS via vm_stat and sysctl."""
     try:
         pagesize_result = subprocess.run(
             ['sysctl', '-n', 'hw.pagesize'],
@@ -158,7 +151,6 @@ def get_used_memory_mb_darwin():
 
 
 def send_message_tcp(sock, message):
-    """Send a message to the server and receive response."""
     try:
         sock.send((message + '\n').encode('utf-8'))
         response = sock.recv(1024).decode('utf-8').strip()
@@ -169,7 +161,6 @@ def send_message_tcp(sock, message):
 
 
 def send_message_udp(sock, message):
-    """Send a UDP message and receive one response datagram."""
     try:
         sock.send(message.encode('utf-8'))
         response = sock.recv(1024).decode('utf-8').strip()
@@ -180,7 +171,6 @@ def send_message_udp(sock, message):
 
 
 def compute_health_status(cpu_pct, local_error_count):
-    """Classify client health from local metrics and communication errors."""
     if cpu_pct >= 90.0 or local_error_count >= 3:
         return 'CRITICAL'
     if cpu_pct >= 75.0 or local_error_count >= 1:
@@ -189,7 +179,6 @@ def compute_health_status(cpu_pct, local_error_count):
 
 
 def report_thread(sock, agent_id, protocol='TCP'):
-    """Periodically send REPORT messages."""
     start_time = time.time()
     local_error_count = 0
     health_enabled = SEND_HEALTH_METADATA
@@ -229,7 +218,6 @@ def report_thread(sock, agent_id, protocol='TCP'):
                         f"Health sent: status={status} uptime={uptime_s:.0f}s errors={local_error_count}"
                     )
                 elif health_response == 'ERROR':
-                    # Keep base TP protocol running if server does not implement HEALTH.
                     health_enabled = False
                     print(
                         f"[{datetime.now().strftime('%H:%M:%S')}] "
@@ -244,7 +232,6 @@ def report_thread(sock, agent_id, protocol='TCP'):
 
 
 def run_attack_mode(sock, agent_id, protocol, burst_count):
-    """Send a massive burst of REPORT messages."""
     print(f"\n[ATTACK] Sending {burst_count} REPORT messages using {protocol}...")
     start = time.time()
     ok_count = 0
@@ -291,7 +278,6 @@ def main():
     print(f"  Connecting to {HOST}:{PORT}\n")
     
     try:
-        # Create socket and connect/bind to server
         if protocol == 'UDP':
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             client_socket.settimeout(2)
@@ -318,16 +304,12 @@ def main():
 
         if burst_count > 0:
             run_attack_mode(client_socket, agent_id, protocol, burst_count)
-        
-        # Start background thread for periodic reports
         report_thread_obj = threading.Thread(
             target=report_thread,
             args=(client_socket, agent_id, protocol),
             daemon=True
         )
         report_thread_obj.start()
-        
-        # Main loop - keep connection alive and handle user input
         print("Agent is running... Press Ctrl+C to disconnect\n")
         while True:
             try:

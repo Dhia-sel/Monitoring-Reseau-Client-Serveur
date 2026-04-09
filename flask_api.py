@@ -12,14 +12,12 @@ app = Flask(__name__)
 
 
 def is_port_open(host, port):
-    """Return True if a TCP service is already listening on host:port."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(0.5)
         return sock.connect_ex((host, port)) == 0
 
 
 def maybe_start_monitor_server(auto_start):
-    """Start monitor server in-process when requested and not already running."""
     if not auto_start:
         return
 
@@ -37,7 +35,6 @@ def maybe_start_monitor_server(auto_start):
 
 
 def build_snapshot(alert_limit=20):
-    """Build a thread-safe snapshot of shared monitoring state."""
     with server_state.agents_lock:
         agents_copy = {agent_id: dict(info) for agent_id, info in server_state.agents.items()}
 

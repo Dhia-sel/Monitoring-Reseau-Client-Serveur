@@ -1,9 +1,3 @@
-"""
-Simplified Client without psutil dependency
-For testing when psutil is not available
-Simulates metrics with random values
-"""
-
 import socket
 import threading
 import time
@@ -18,7 +12,6 @@ REPORT_INTERVAL = 10
 
 
 def send_message_tcp(sock, message):
-    """Send a message to the server and receive response."""
     try:
         sock.send((message + '\n').encode('utf-8'))
         response = sock.recv(1024).decode('utf-8').strip()
@@ -29,7 +22,6 @@ def send_message_tcp(sock, message):
 
 
 def send_message_udp(sock, message):
-    """Send one UDP message and wait for one response."""
     try:
         sock.send(message.encode('utf-8'))
         response = sock.recv(1024).decode('utf-8').strip()
@@ -40,14 +32,12 @@ def send_message_udp(sock, message):
 
 
 def get_random_metrics():
-    """Generate random metrics for testing (no psutil required)."""
     cpu_pct = round(random.uniform(10, 80), 1)
     ram_mb = round(random.uniform(1024, 4096), 0)
     return cpu_pct, ram_mb
 
 
 def report_thread(sock, agent_id, protocol):
-    """Periodically send REPORT messages with simulated metrics."""
     while True:
         try:
             time.sleep(REPORT_INTERVAL)
@@ -72,7 +62,6 @@ def report_thread(sock, agent_id, protocol):
 
 
 def run_attack_mode(sock, agent_id, protocol, burst_count):
-    """Send a burst of REPORT messages for stress testing."""
     print(f"\n[ATTACK] Sending {burst_count} REPORT messages using {protocol}...")
     ok_count = 0
     start = time.time()
@@ -94,7 +83,6 @@ def run_attack_mode(sock, agent_id, protocol, burst_count):
 
 
 def main():
-    """Main client function."""
     # Get agent configuration
     generated_uuid = str(uuid.uuid4())
     agent_id = input(f"Enter agent ID (default UUID: {generated_uuid}): ").strip() or generated_uuid
@@ -128,7 +116,6 @@ def main():
             client_socket.connect((HOST, PORT))
             print("Connected to server\n")
         
-        # Send HELLO message
         hello_msg = f"HELLO {agent_id} {hostname}"
         if protocol == 'UDP':
             response = send_message_udp(client_socket, hello_msg)
@@ -145,7 +132,6 @@ def main():
         if burst_count > 0:
             run_attack_mode(client_socket, agent_id, protocol, burst_count)
         
-        # Start background thread for periodic reports
         report_thread_obj = threading.Thread(
             target=report_thread,
             args=(client_socket, agent_id, protocol),
@@ -153,7 +139,6 @@ def main():
         )
         report_thread_obj.start()
         
-        # Main loop - keep connection alive
         print("Agent is running... Press Ctrl+C to disconnect\n")
         while True:
             try:
@@ -162,7 +147,6 @@ def main():
                 print("\n\nShutting down agent...")
                 break
         
-        # Send BYE message
         bye_msg = f"BYE {agent_id}"
         if protocol == 'UDP':
             response = send_message_udp(client_socket, bye_msg)

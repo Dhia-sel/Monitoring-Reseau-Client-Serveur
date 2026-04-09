@@ -4,10 +4,9 @@ import time
 import csv
 from datetime import datetime
 
-# Server configuration
 HOST = '127.0.0.1'
 PORT = 5051
-ACTIVE_WINDOW = 30  # 3 × T seconds (T = 10s, so 30s window for active agents)
+ACTIVE_WINDOW = 30  
 STATS_INTERVAL = 10
 CSV_FILE = 'stats_export.csv'
 CPU_ALERT_THRESHOLD = 85.0
@@ -15,20 +14,19 @@ ERROR_ALERT_THRESHOLD = 5
 ERROR_ALERT_WINDOW = 10
 ERROR_ALERT_COOLDOWN = 10
 
-# Global state
+
 agents_lock = threading.Lock()
-agents = {}  # agent_id -> {hostname, last_report_time, cpu_pct, ram_mb, protocol, addr}
+agents = {}  
 metrics_lock = threading.Lock()
 total_reports = 0
 error_timestamps = []
 last_error_alert_time = 0.0
 alerts_lock = threading.Lock()
-alerts = []  # list of {timestamp, type, agent_id, message}
+alerts = []
 HEALTH_STATUSES = {'OK', 'DEGRADED', 'CRITICAL'}
 
 
 def record_alert(alert_type, message, agent_id=None):
-    """Store and print an alert event."""
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     payload = {
         'timestamp': timestamp,
@@ -46,13 +44,11 @@ def record_alert(alert_type, message, agent_id=None):
 
 
 def get_recent_alerts(limit=20):
-    """Return a snapshot of the most recent alert events."""
     with alerts_lock:
         return list(alerts[-limit:])
 
 
 def reset_state_for_tests():
-    """Reset mutable globals to support deterministic tests."""
     global total_reports, last_error_alert_time
     with agents_lock:
         agents.clear()
@@ -65,7 +61,6 @@ def reset_state_for_tests():
 
 
 def register_error_response():
-    """Track ERROR responses and alert if too many occur in a short window."""
     global last_error_alert_time
     now = time.time()
     should_alert = False
@@ -87,7 +82,6 @@ def register_error_response():
 
 
 def check_inactive_agents_once(now=None):
-    """Remove inactive agents one time and emit inactivity alerts."""
     if now is None:
         now = time.time()
 
@@ -110,7 +104,6 @@ def check_inactive_agents_once(now=None):
 
 
 def write_csv_row(timestamp, num_active, avg_cpu, avg_ram):
-    """Append one statistics line to CSV export file."""
     file_exists = False
     try:
         with open(CSV_FILE, 'r', encoding='utf-8'):
@@ -127,17 +120,14 @@ def write_csv_row(timestamp, num_active, avg_cpu, avg_ram):
 
 
 def validate_report(cpu_pct, ram_mb):
-    """Validate metric ranges."""
     return 0 <= cpu_pct <= 100 and ram_mb >= 0
 
 
 def validate_health(status, uptime_s, error_count):
-    """Validate health metadata values."""
     return status in HEALTH_STATUSES and uptime_s >= 0 and error_count >= 0
 
 
 def process_message(message, addr, protocol='TCP'):
-    """Process one protocol message and return (response, should_close)."""
     global total_reports
 
     message = message.strip()
@@ -293,7 +283,6 @@ def process_message(message, addr, protocol='TCP'):
 
 
 def is_agent_active(agent_id):
-    """Check if an agent is still active based on the activity window."""
     with agents_lock:
         if agent_id not in agents:
             return False
@@ -302,7 +291,6 @@ def is_agent_active(agent_id):
 
 
 def handle_client(conn, addr):
-    """Handle a single client connection in a separate thread."""
     try:
         buffer = ''
         while True:
@@ -339,14 +327,12 @@ def udp_listener(udp_socket):
 
 
 def inactive_cleanup_thread():
-    """Remove inactive agents periodically."""
     while True:
         time.sleep(5)
         check_inactive_agents_once()
 
 
 def statistics_thread():
-    """Periodically display statistics about active agents."""
     while True:
         time.sleep(STATS_INTERVAL)
         
@@ -394,7 +380,6 @@ def statistics_thread():
 
 
 def main():
-    """Start the server."""
     tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     tcp_socket.bind((HOST, PORT))
