@@ -1,8 +1,3 @@
-"""
-Test Suite for Network Monitoring System
-Tests all required scenarios from project specification
-"""
-
 import socket
 import time
 import uuid
@@ -10,7 +5,6 @@ import server as server_module
 
 
 class TestClient:
-    """Helper class for testing protocol messages."""
     
     def __init__(self, host='127.0.0.1', port=5051, protocol='TCP'):
         self.host = host
@@ -19,7 +13,6 @@ class TestClient:
         self.sock = None
     
     def connect(self):
-        """Connect to server."""
         try:
             if self.protocol == 'UDP':
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -34,7 +27,6 @@ class TestClient:
             return False
     
     def send_raw(self, message):
-        """Send raw message and get response."""
         try:
             if self.protocol == 'UDP':
                 self.sock.send(message.encode('utf-8'))
@@ -47,7 +39,6 @@ class TestClient:
             return None
     
     def close(self):
-        """Close connection."""
         try:
             if self.sock:
                 self.sock.close()
@@ -56,43 +47,39 @@ class TestClient:
 
 
 def test_1_single_client_connection():
-    """Test 1: Single client connection and registration."""
     print("\n" + "="*60)
     print("TEST 1: Single Client Connection")
     print("="*60)
     
     client = TestClient()
     if not client.connect():
-        print("❌ FAILED: Could not connect")
+        print("FAILED: Could not connect")
         return False
-    
-    # Send HELLO
+
     response = client.send_raw("HELLO agent1 WORKSTATION")
     if response == 'OK':
-        print("✓ PASSED: Agent registered successfully")
+        print("PASSED: Agent registered successfully")
         print(f"  Response: {response}")
     else:
-        print(f"❌ FAILED: Expected OK, got {response}")
+        print(f"FAILED: Expected OK, got {response}")
         client.close()
         return False
-    
-    # Send REPORT
+
     response = client.send_raw("REPORT agent1 1700000000 25.5 2048")
     if response == 'OK':
-        print("✓ PASSED: Report accepted")
+        print("PASSED: Report accepted")
         print(f"  Response: {response}")
     else:
-        print(f"❌ FAILED: Expected OK, got {response}")
+        print(f"FAILED: Expected OK, got {response}")
         client.close()
         return False
-    
-    # Send BYE
+
     response = client.send_raw("BYE agent1")
     if response == 'OK':
-        print("✓ PASSED: Graceful disconnect")
+        print("PASSED: Graceful disconnect")
         print(f"  Response: {response}")
     else:
-        print(f"❌ FAILED: Expected OK, got {response}")
+        print(f"FAILED: Expected OK, got {response}")
         client.close()
         return False
     
@@ -108,44 +95,39 @@ def test_2_multiple_concurrent_clients():
     
     clients = []
     agent_ids = ['agent_multi_1', 'agent_multi_2', 'agent_multi_3']
-    
-    # Connect all clients
+
     for agent_id in agent_ids:
         client = TestClient()
         if not client.connect():
-            print(f"❌ FAILED: Could not connect client {agent_id}")
+            print(f"FAILED: Could not connect client {agent_id}")
             return False
         clients.append((agent_id, client))
     
-    print(f"✓ Connected {len(clients)} clients")
-    
-    # Register all clients
+    print(f"Connected {len(clients)} clients")
+
     for agent_id, client in clients:
         response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
         if response != 'OK':
-            print(f"❌ FAILED: Could not register {agent_id}")
+            print(f"FAILED: Could not register {agent_id}")
             return False
     
-    print(f"✓ Registered {len(clients)} clients")
-    
-    # Send reports from all
+    print(f"Registered {len(clients)} clients")
     for agent_id, client in clients:
         response = client.send_raw(f"REPORT {agent_id} 1700000000 20.0 1500")
         if response != 'OK':
-            print(f"❌ FAILED: Report from {agent_id} rejected")
+            print(f"FAILED: Report from {agent_id} rejected")
             return False
     
-    print(f"✓ All {len(clients)} reports accepted")
-    
-    # Disconnect all
+    print(f"All {len(clients)} reports accepted")
+
     for agent_id, client in clients:
         response = client.send_raw(f"BYE {agent_id}")
         if response != 'OK':
-            print(f"❌ FAILED: Could not disconnect {agent_id}")
+            print(f"FAILED: Could not disconnect {agent_id}")
             return False
         client.close()
     
-    print(f"✓ PASSED: All {len(clients)} clients disconnected gracefully")
+    print(f" PASSED: All {len(clients)} clients disconnected gracefully")
     return True
 
 
@@ -168,16 +150,16 @@ def test_3_malformed_messages():
     for message, description in test_cases:
         client = TestClient()
         if not client.connect():
-            print(f"❌ Could not connect for test: {description}")
+            print(f"Could not connect for test: {description}")
             continue
         
         response = client.send_raw(message)
         if response == 'ERROR':
-            print(f"✓ Correctly rejected: {description}")
+            print(f"Correctly rejected: {description}")
             print(f"  Message: {message}")
             print(f"  Response: {response}")
         else:
-            print(f"❌ Should reject: {description}")
+            print(f" Should reject: {description}")
             print(f"  Message: {message}")
             print(f"  Got: {response}")
         
@@ -194,32 +176,30 @@ def test_4_unregistered_agent():
     
     client = TestClient()
     if not client.connect():
-        print("❌ FAILED: Could not connect")
+        print("FAILED: Could not connect")
         return False
-    
-    # Try to send report without HELLO first
+ 
     response = client.send_raw("REPORT unknown_agent 1700000000 30 2000")
     if response == 'ERROR':
-        print("✓ PASSED: Report from unregistered agent rejected")
+        print("PASSED: Report from unregistered agent rejected")
         print(f"  Response: {response}")
     else:
-        print(f"❌ FAILED: Should reject unregistered agent, got {response}")
+        print(f"FAILED: Should reject unregistered agent, got {response}")
         client.close()
         return False
-    
-    # Now register and try again
+
     response = client.send_raw("HELLO unknown_agent WORKSTATION")
     if response != 'OK':
-        print("❌ FAILED: Registration failed")
+        print("FAILED: Registration failed")
         client.close()
         return False
     
     response = client.send_raw("REPORT unknown_agent 1700000000 30 2000")
     if response == 'OK':
-        print("✓ PASSED: Report accepted after registration")
+        print("PASSED: Report accepted after registration")
         print(f"  Response: {response}")
     else:
-        print(f"❌ FAILED: Report should be accepted, got {response}")
+        print(f"FAILED: Report should be accepted, got {response}")
         client.close()
         return False
     
@@ -246,21 +226,19 @@ def test_5_metric_validation():
         client = TestClient()
         if not client.connect():
             continue
-        
-        # Register first
+
         client.send_raw(f"HELLO metric_test_{i} WORKSTATION")
-        
-        # Send report with test values
+ 
         response = client.send_raw(f"REPORT metric_test_{i} 1700000000 {cpu} {ram}")
         
         if should_pass and response == 'OK':
-            print(f"✓ Accepted: {description} (CPU={cpu}%, RAM={ram}MB)")
+            print(f"Accepted: {description} (CPU={cpu}%, RAM={ram}MB)")
         elif not should_pass and response == 'ERROR':
-            print(f"✓ Rejected: {description} (CPU={cpu}%, RAM={ram}MB)")
+            print(f"Rejected: {description} (CPU={cpu}%, RAM={ram}MB)")
         else:
             status = "accepted" if response == 'OK' else "rejected"
             expected = "accepted" if should_pass else "rejected"
-            print(f"❌ {description}: {status}, but expected {expected}")
+            print(f"{description}: {status}, but expected {expected}")
         
         client.close()
     
@@ -274,16 +252,15 @@ def test_6_disconnect_and_reconnect():
     print("="*60)
     
     agent_id = "reconnect_test"
-    
-    # First connection
+
     client1 = TestClient()
     if not client1.connect():
-        print("❌ FAILED: Could not connect first time")
+        print("FAILED: Could not connect first time")
         return False
     
     response = client1.send_raw(f"HELLO {agent_id} WORKSTATION")
     if response != 'OK':
-        print("❌ FAILED: First registration failed")
+        print("FAILED: First registration failed")
         return False
     
     print(f"✓ First connection and registration successful")
@@ -291,36 +268,33 @@ def test_6_disconnect_and_reconnect():
     # Send report
     response = client1.send_raw(f"REPORT {agent_id} 1700000000 25 2000")
     if response != 'OK':
-        print("❌ FAILED: First report failed")
+        print("FAILED: First report failed")
         return False
     
-    print(f"✓ First report sent")
-    
-    # Disconnect
+    print(f"First report sent")
+
     client1.send_raw(f"BYE {agent_id}")
     client1.close()
     
-    print(f"✓ Disconnected")
-    
-    # Wait a moment
+    print(f" Disconnected")
+
     time.sleep(1)
-    
-    # Reconnect with same agent_id
+
     client2 = TestClient()
     if not client2.connect():
-        print("❌ FAILED: Could not reconnect")
+        print("FAILED: Could not reconnect")
         return False
     
     response = client2.send_raw(f"HELLO {agent_id} WORKSTATION")
     if response != 'OK':
-        print("❌ FAILED: Second registration failed")
+        print("FAILED: Second registration failed")
         return False
     
-    print(f"✓ PASSED: Reconnected and re-registered with same agent_id")
+    print(f"PASSED: Reconnected and re-registered with same agent_id")
     
     response = client2.send_raw(f"REPORT {agent_id} 1700000000 30 2100")
     if response == 'OK':
-        print(f"✓ Second report sent successfully")
+        print(f"Second report sent successfully")
     
     client2.close()
     return True
@@ -335,31 +309,30 @@ def test_7_udp_flow():
     agent_id = "udp_test_agent"
     client = TestClient(protocol='UDP')
     if not client.connect():
-        print("❌ FAILED: Could not create UDP client")
+        print("FAILED: Could not create UDP client")
         return False
 
     response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
     if response != 'OK':
-        print(f"❌ FAILED: UDP HELLO rejected: {response}")
+        print(f"FAILED: UDP HELLO rejected: {response}")
         return False
 
     response = client.send_raw(f"REPORT {agent_id} 1700000000 33.3 1800")
     if response != 'OK':
-        print(f"❌ FAILED: UDP REPORT rejected: {response}")
+        print(f"FAILED: UDP REPORT rejected: {response}")
         return False
 
     response = client.send_raw(f"BYE {agent_id}")
     if response != 'OK':
-        print(f"❌ FAILED: UDP BYE rejected: {response}")
+        print(f"FAILED: UDP BYE rejected: {response}")
         return False
 
     client.close()
-    print("✓ PASSED: UDP flow works")
+    print("PASSED: UDP flow works")
     return True
 
 
 def test_8_uuid_agent_id():
-    """Test 8: UUID as agent_id should be accepted."""
     print("\n" + "="*60)
     print("TEST 8: UUID Agent ID")
     print("="*60)
@@ -367,31 +340,30 @@ def test_8_uuid_agent_id():
     agent_id = str(uuid.uuid4())
     client = TestClient()
     if not client.connect():
-        print("❌ FAILED: Could not connect")
+        print("FAILED: Could not connect")
         return False
 
     response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
     if response != 'OK':
-        print(f"❌ FAILED: UUID HELLO rejected: {response}")
+        print(f"FAILED: UUID HELLO rejected: {response}")
         return False
 
     response = client.send_raw(f"REPORT {agent_id} 1700000000 12.2 1024")
     if response != 'OK':
-        print(f"❌ FAILED: UUID REPORT rejected: {response}")
+        print(f"FAILED: UUID REPORT rejected: {response}")
         return False
 
     response = client.send_raw(f"BYE {agent_id}")
     if response != 'OK':
-        print(f"❌ FAILED: UUID BYE rejected: {response}")
+        print(f"FAILED: UUID BYE rejected: {response}")
         return False
 
     client.close()
-    print("✓ PASSED: UUID agent ID accepted")
+    print("PASSED: UUID agent ID accepted")
     return True
 
 
 def test_9_abrupt_disconnect():
-    """Test 9: Abrupt client disconnect (no BYE message)."""
     print("\n" + "="*60)
     print("TEST 9: Abrupt Client Disconnect")
     print("="*60)
@@ -400,42 +372,36 @@ def test_9_abrupt_disconnect():
     client = TestClient()
     
     if not client.connect():
-        print("❌ FAILED: Could not connect")
+        print("FAILED: Could not connect")
         return False
-    
-    # Register agent
+
     response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
     if response != 'OK':
-        print("❌ FAILED: Registration failed")
+        print("FAILED: Registration failed")
         return False
     
-    print(f"✓ Agent {agent_id} registered")
-    
-    # Send report
+    print(f"Agent {agent_id} registered")
+
     response = client.send_raw(f"REPORT {agent_id} 1700000000 45.5 2048")
     if response != 'OK':
-        print("❌ FAILED: Report failed")
+        print("FAILED: Report failed")
         return False
     
-    print(f"✓ Report sent")
-    
-    # Abruptly close without sending BYE
+    print(f"Report sent")
+
     client.sock.close()
-    print(f"✓ Connection closed abruptly without BYE")
-    
-    # Wait for server cleanup (ACTIVE_WINDOW = 30s, check every 5s)
-    print(f"✓ Server will timeout agent after ~30 seconds")
-    print("✓ PASSED: Abrupt disconnect handled gracefully by server")
+    print(f"Connection closed abruptly without BYE")
+
+    print(f"Server will timeout agent after ~30 seconds")
+    print("PASSED: Abrupt disconnect handled gracefully by server")
     return True
 
 
 def test_10_average_calculation():
-    """Test 10: Verify correct average calculation of CPU and RAM."""
     print("\n" + "="*60)
     print("TEST 10: Average Calculation Validation")
     print("="*60)
-    
-    # Register 3 agents with known metrics
+
     test_data = [
         ("avg_test_1", 10.0, 1000.0),
         ("avg_test_2", 30.0, 2000.0),
@@ -444,38 +410,35 @@ def test_10_average_calculation():
     
     clients = []
     
-    # Register and send reports
     for agent_id, cpu, ram in test_data:
         client = TestClient()
         if not client.connect():
-            print(f"❌ FAILED: Could not connect {agent_id}")
+            print(f"FAILED: Could not connect {agent_id}")
             return False
         
         response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
         if response != 'OK':
-            print(f"❌ FAILED: Registration failed for {agent_id}")
+            print(f"FAILED: Registration failed for {agent_id}")
             return False
         
         response = client.send_raw(f"REPORT {agent_id} 1700000000 {cpu} {ram}")
         if response != 'OK':
-            print(f"❌ FAILED: Report failed for {agent_id}")
+            print(f"FAILED: Report failed for {agent_id}")
             return False
         
         clients.append((agent_id, client))
-        print(f"✓ {agent_id}: CPU={cpu}%, RAM={ram}MB")
-    
-    # Calculate expected averages
+        print(f" {agent_id}: CPU={cpu}%, RAM={ram}MB")
+
     cpu_values = [cpu for _, cpu, _ in test_data]
     ram_values = [ram for _, _, ram in test_data]
     expected_cpu = sum(cpu_values) / len(cpu_values)
     expected_ram = sum(ram_values) / len(ram_values)
     
-    print(f"\n✓ Expected Average CPU: {expected_cpu:.2f}%")
-    print(f"✓ Expected Average RAM: {expected_ram:.2f}MB")
-    print(f"✓ Server should display these values in statistics output")
-    print("✓ PASSED: Verification metrics ready - check server output")
-    
-    # Cleanup
+    print(f"\n Expected Average CPU: {expected_cpu:.2f}%")
+    print(f" Expected Average RAM: {expected_ram:.2f}MB")
+    print(f" Server should display these values in statistics output")
+    print(" PASSED: Verification metrics ready - check server output")
+
     for agent_id, client in clients:
         client.send_raw(f"BYE {agent_id}")
         client.close()
@@ -484,7 +447,6 @@ def test_10_average_calculation():
 
 
 def test_11_agent_inactivity_detection():
-    """Test 11: Inactive agent detection and removal (3×T window)."""
     print("\n" + "="*60)
     print("TEST 11: Agent Inactivity Detection")
     print("="*60)
@@ -493,36 +455,33 @@ def test_11_agent_inactivity_detection():
     client = TestClient()
     
     if not client.connect():
-        print("❌ FAILED: Could not connect")
+        print("FAILED: Could not connect")
         return False
-    
-    # Register agent
+
     response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
     if response != 'OK':
-        print("❌ FAILED: Registration failed")
+        print("FAILED: Registration failed")
         return False
     
-    print(f"✓ Agent registered")
+    print(f"Agent registered")
     
-    # Send initial report
     response = client.send_raw(f"REPORT {agent_id} 1700000000 20.0 1500")
     if response != 'OK':
-        print("❌ FAILED: Report failed")
+        print("FAILED: Report failed")
         return False
     
-    print(f"✓ First report sent")
-    print(f"✓ Active window = 30 seconds (3 × T where T=10s)")
-    print(f"✓ Agent will be marked inactive if no report received for 30s")
-    print(f"✓ Note: Full test requires waiting ~35 seconds")
-    print("⚠ To verify: Check server log for '[CLEANUP]' messages")
-    print("✓ PASSED: Inactivity detection logic is in place server-side")
+    print(f"First report sent")
+    print(f"Active window = 30 seconds (3 × T where T=10s)")
+    print(f"Agent will be marked inactive if no report received for 30s")
+    print(f"Note: Full test requires waiting ~35 seconds")
+    print("To verify: Check server log for '[CLEANUP]' messages")
+    print("PASSED: Inactivity detection logic is in place server-side")
     
     client.close()
     return True
 
 
 def test_12_cpu_alert_trigger():
-    """Test 12: CPU alert must trigger when threshold is exceeded."""
     print("\n" + "="*60)
     print("TEST 12: CPU Alert Trigger")
     print("="*60)
@@ -531,7 +490,7 @@ def test_12_cpu_alert_trigger():
 
     response, _ = server_module.process_message("HELLO alert_cpu_1 HOST", ("127.0.0.1", 9999), protocol='TCP')
     if response != 'OK':
-        print("❌ FAILED: HELLO rejected")
+        print("FAILED: HELLO rejected")
         return False
 
     response, _ = server_module.process_message(
@@ -540,20 +499,19 @@ def test_12_cpu_alert_trigger():
         protocol='TCP',
     )
     if response != 'OK':
-        print("❌ FAILED: REPORT rejected")
+        print("FAILED: REPORT rejected")
         return False
 
     cpu_alerts = [a for a in server_module.get_recent_alerts() if a['type'] == 'CPU_HIGH' and a['agent_id'] == 'alert_cpu_1']
     if not cpu_alerts:
-        print("❌ FAILED: CPU_HIGH alert not generated")
+        print("FAILED: CPU_HIGH alert not generated")
         return False
 
-    print("✓ PASSED: CPU_HIGH alert generated")
+    print("PASSED: CPU_HIGH alert generated")
     return True
 
 
 def test_13_inactive_agent_alert_trigger():
-    """Test 13: Inactivity alert must trigger when cleanup removes an agent."""
     print("\n" + "="*60)
     print("TEST 13: Inactive Agent Alert")
     print("="*60)
@@ -562,7 +520,7 @@ def test_13_inactive_agent_alert_trigger():
 
     response, _ = server_module.process_message("HELLO alert_inactive_1 HOST", ("127.0.0.1", 9998), protocol='TCP')
     if response != 'OK':
-        print("❌ FAILED: HELLO rejected")
+        print("FAILED: HELLO rejected")
         return False
 
     now = time.time()
@@ -571,7 +529,7 @@ def test_13_inactive_agent_alert_trigger():
 
     removed_agents = server_module.check_inactive_agents_once(now=now)
     if not removed_agents:
-        print("❌ FAILED: Agent was not removed by inactivity check")
+        print("FAILED: Agent was not removed by inactivity check")
         return False
 
     inactive_alerts = [
@@ -579,15 +537,14 @@ def test_13_inactive_agent_alert_trigger():
         if a['type'] == 'AGENT_INACTIVE' and a['agent_id'] == 'alert_inactive_1'
     ]
     if not inactive_alerts:
-        print("❌ FAILED: AGENT_INACTIVE alert not generated")
+        print("FAILED: AGENT_INACTIVE alert not generated")
         return False
 
-    print("✓ PASSED: AGENT_INACTIVE alert generated")
+    print("PASSED: AGENT_INACTIVE alert generated")
     return True
 
 
 def test_14_error_storm_alert_trigger():
-    """Test 14: Error storm alert must trigger after many malformed messages."""
     print("\n" + "="*60)
     print("TEST 14: Error Storm Alert")
     print("="*60)
@@ -597,20 +554,19 @@ def test_14_error_storm_alert_trigger():
     for _ in range(server_module.ERROR_ALERT_THRESHOLD):
         response, _ = server_module.process_message("INVALID bad_msg", ("127.0.0.1", 9997), protocol='TCP')
         if response != 'ERROR':
-            print("❌ FAILED: Malformed message should return ERROR")
+            print("FAILED: Malformed message should return ERROR")
             return False
 
     error_alerts = [a for a in server_module.get_recent_alerts() if a['type'] == 'ERROR_STORM']
     if not error_alerts:
-        print("❌ FAILED: ERROR_STORM alert not generated")
+        print("FAILED: ERROR_STORM alert not generated")
         return False
 
-    print("✓ PASSED: ERROR_STORM alert generated")
+    print("PASSED: ERROR_STORM alert generated")
     return True
 
 
 def test_15_health_metadata_valid():
-    """Test 15: HEALTH metadata should be accepted and stored for registered agent."""
     print("\n" + "="*60)
     print("TEST 15: HEALTH Metadata Valid")
     print("="*60)
@@ -619,7 +575,7 @@ def test_15_health_metadata_valid():
 
     response, _ = server_module.process_message("HELLO health_agent_1 HOST", ("127.0.0.1", 9996), protocol='TCP')
     if response != 'OK':
-        print("❌ FAILED: HELLO rejected")
+        print("FAILED: HELLO rejected")
         return False
 
     response, _ = server_module.process_message(
@@ -628,26 +584,25 @@ def test_15_health_metadata_valid():
         protocol='TCP',
     )
     if response != 'OK':
-        print("❌ FAILED: HEALTH rejected")
+        print("FAILED: HEALTH rejected")
         return False
 
     with server_module.agents_lock:
         health_data = server_module.agents['health_agent_1'].get('health', {})
 
     if health_data.get('status') != 'DEGRADED':
-        print("❌ FAILED: HEALTH status was not stored correctly")
+        print("FAILED: HEALTH status was not stored correctly")
         return False
 
     if int(health_data.get('error_count', -1)) != 2:
-        print("❌ FAILED: HEALTH error_count was not stored correctly")
+        print("FAILED: HEALTH error_count was not stored correctly")
         return False
 
-    print("✓ PASSED: HEALTH metadata accepted and stored")
+    print("PASSED: HEALTH metadata accepted and stored")
     return True
 
 
 def test_16_health_metadata_malformed():
-    """Test 16: Malformed HEALTH messages should be rejected."""
     print("\n" + "="*60)
     print("TEST 16: HEALTH Metadata Malformed")
     print("="*60)
@@ -656,31 +611,28 @@ def test_16_health_metadata_malformed():
 
     response, _ = server_module.process_message("HELLO health_agent_2 HOST", ("127.0.0.1", 9995), protocol='TCP')
     if response != 'OK':
-        print("❌ FAILED: HELLO rejected")
+        print("FAILED: HELLO rejected")
         return False
 
-    # Missing fields
     response, _ = server_module.process_message("HEALTH health_agent_2 1700000000", ("127.0.0.1", 9995), protocol='TCP')
     if response != 'ERROR':
-        print("❌ FAILED: Incomplete HEALTH should return ERROR")
+        print("FAILED: Incomplete HEALTH should return ERROR")
         return False
 
-    # Invalid status
     response, _ = server_module.process_message(
         "HEALTH health_agent_2 1700000001 UNKNOWN 10 0",
         ("127.0.0.1", 9995),
         protocol='TCP',
     )
     if response != 'ERROR':
-        print("❌ FAILED: Invalid HEALTH status should return ERROR")
+        print("FAILED: Invalid HEALTH status should return ERROR")
         return False
 
-    print("✓ PASSED: Malformed HEALTH messages rejected")
+    print("PASSED: Malformed HEALTH messages rejected")
     return True
 
 
 def test_17_health_unregistered_agent():
-    """Test 17: HEALTH from unregistered agent should be rejected."""
     print("\n" + "="*60)
     print("TEST 17: HEALTH Unregistered Agent")
     print("="*60)
@@ -693,15 +645,14 @@ def test_17_health_unregistered_agent():
         protocol='TCP',
     )
     if response != 'ERROR':
-        print("❌ FAILED: HEALTH from unregistered agent should return ERROR")
+        print("FAILED: HEALTH from unregistered agent should return ERROR")
         return False
 
-    print("✓ PASSED: Unregistered HEALTH rejected")
+    print("PASSED: Unregistered HEALTH rejected")
     return True
 
 
 def run_all_tests():
-    """Run all tests."""
     print("\n\n")
     print("#" * 60)
     print("# NETWORK MONITORING SYSTEM - TEST SUITE")
@@ -730,8 +681,7 @@ def run_all_tests():
         "Test 16: Health Metadata Malformed": test_16_health_metadata_malformed(),
         "Test 17: Health Unregistered Agent": test_17_health_unregistered_agent(),
     }
-    
-    # Summary
+
     print("\n\n" + "="*60)
     print("TEST SUMMARY")
     print("="*60)
