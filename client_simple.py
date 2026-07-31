@@ -5,6 +5,8 @@ import random
 import uuid
 from datetime import datetime
 
+import config
+
 
 HOST = '127.0.0.1'
 PORT = 5051
@@ -116,7 +118,7 @@ def main():
             client_socket.connect((HOST, PORT))
             print("Connected to server\n")
         
-        hello_msg = f"HELLO {agent_id} {hostname}"
+        hello_msg = f"HELLO {agent_id} {hostname} {config.AGENT_AUTH_TOKEN}"
         if protocol == 'UDP':
             response = send_message_udp(client_socket, hello_msg)
         else:

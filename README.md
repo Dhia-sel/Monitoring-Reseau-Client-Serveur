@@ -251,7 +251,7 @@ Interface web temps réel accessible sur `http://127.0.0.1:8000` :
 - **Panneau alertes** : affichage des alertes `CPU_HIGH`, `AGENT_INACTIVE`, `ERROR_STORM`
 - Rafraîchissement automatique toutes les **3 secondes** (polling)
 
-Endpoints REST exposés par `flask_api.py` :
+Endpoints REST exposés par `flask_api.py` 
 
 | Endpoint      | Méthode | Description                         |
 | ------------- | ------- | ----------------------------------- |

@@ -4,6 +4,8 @@ import time
 import csv
 from datetime import datetime
 
+import config
+
 HOST = '127.0.0.1'
 PORT = 5051
 ACTIVE_WINDOW = 30  
@@ -139,13 +141,24 @@ def process_message(message, addr, protocol='TCP'):
     tokens = message.split()
 
     if message.startswith('HELLO'):
-        if len(tokens) < 3:
+        if len(tokens) < 4:
             print(f"[{protocol} {addr}] ERROR: Malformed HELLO message")
             register_error_response()
             return 'ERROR', False
 
         agent_id = tokens[1]
         hostname = tokens[2]
+        provided_token = tokens[3]
+
+        if provided_token != config.AGENT_AUTH_TOKEN:
+            print(f"[{protocol} {addr}] AUTH FAILED for agent_id={agent_id}")
+            record_alert(
+                'AUTH_FAILURE',
+                f"Invalid auth token presented by {addr}",
+                agent_id=agent_id,
+            )
+            register_error_response()
+            return 'ERROR', False
 
         with agents_lock:
             agents[agent_id] = {

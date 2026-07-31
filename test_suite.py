@@ -1,6 +1,7 @@
 import socket
 import time
 import uuid
+import config
 import server as server_module
 
 
@@ -56,7 +57,7 @@ def test_1_single_client_connection():
         print("FAILED: Could not connect")
         return False
 
-    response = client.send_raw("HELLO agent1 WORKSTATION")
+    response = client.send_raw(f"HELLO agent1 WORKSTATION {config.AGENT_AUTH_TOKEN}")
     if response == 'OK':
         print("PASSED: Agent registered successfully")
         print(f"  Response: {response}")
@@ -106,7 +107,7 @@ def test_2_multiple_concurrent_clients():
     print(f"Connected {len(clients)} clients")
 
     for agent_id, client in clients:
-        response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
+        response = client.send_raw(f"HELLO {agent_id} WORKSTATION {config.AGENT_AUTH_TOKEN}")
         if response != 'OK':
             print(f"FAILED: Could not register {agent_id}")
             return False
@@ -188,7 +189,7 @@ def test_4_unregistered_agent():
         client.close()
         return False
 
-    response = client.send_raw("HELLO unknown_agent WORKSTATION")
+    response = client.send_raw(f"HELLO unknown_agent WORKSTATION {config.AGENT_AUTH_TOKEN}")
     if response != 'OK':
         print("FAILED: Registration failed")
         client.close()
@@ -227,7 +228,7 @@ def test_5_metric_validation():
         if not client.connect():
             continue
 
-        client.send_raw(f"HELLO metric_test_{i} WORKSTATION")
+        client.send_raw(f"HELLO metric_test_{i} WORKSTATION {config.AGENT_AUTH_TOKEN}")
  
         response = client.send_raw(f"REPORT metric_test_{i} 1700000000 {cpu} {ram}")
         
@@ -258,7 +259,7 @@ def test_6_disconnect_and_reconnect():
         print("FAILED: Could not connect first time")
         return False
     
-    response = client1.send_raw(f"HELLO {agent_id} WORKSTATION")
+    response = client1.send_raw(f"HELLO {agent_id} WORKSTATION {config.AGENT_AUTH_TOKEN}")
     if response != 'OK':
         print("FAILED: First registration failed")
         return False
@@ -285,7 +286,7 @@ def test_6_disconnect_and_reconnect():
         print("FAILED: Could not reconnect")
         return False
     
-    response = client2.send_raw(f"HELLO {agent_id} WORKSTATION")
+    response = client2.send_raw(f"HELLO {agent_id} WORKSTATION {config.AGENT_AUTH_TOKEN}")
     if response != 'OK':
         print("FAILED: Second registration failed")
         return False
@@ -312,7 +313,7 @@ def test_7_udp_flow():
         print("FAILED: Could not create UDP client")
         return False
 
-    response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
+    response = client.send_raw(f"HELLO {agent_id} WORKSTATION {config.AGENT_AUTH_TOKEN}")
     if response != 'OK':
         print(f"FAILED: UDP HELLO rejected: {response}")
         return False
@@ -343,7 +344,7 @@ def test_8_uuid_agent_id():
         print("FAILED: Could not connect")
         return False
 
-    response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
+    response = client.send_raw(f"HELLO {agent_id} WORKSTATION {config.AGENT_AUTH_TOKEN}")
     if response != 'OK':
         print(f"FAILED: UUID HELLO rejected: {response}")
         return False
@@ -375,7 +376,7 @@ def test_9_abrupt_disconnect():
         print("FAILED: Could not connect")
         return False
 
-    response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
+    response = client.send_raw(f"HELLO {agent_id} WORKSTATION {config.AGENT_AUTH_TOKEN}")
     if response != 'OK':
         print("FAILED: Registration failed")
         return False
@@ -416,7 +417,7 @@ def test_10_average_calculation():
             print(f"FAILED: Could not connect {agent_id}")
             return False
         
-        response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
+        response = client.send_raw(f"HELLO {agent_id} WORKSTATION {config.AGENT_AUTH_TOKEN}")
         if response != 'OK':
             print(f"FAILED: Registration failed for {agent_id}")
             return False
@@ -458,7 +459,7 @@ def test_11_agent_inactivity_detection():
         print("FAILED: Could not connect")
         return False
 
-    response = client.send_raw(f"HELLO {agent_id} WORKSTATION")
+    response = client.send_raw(f"HELLO {agent_id} WORKSTATION {config.AGENT_AUTH_TOKEN}")
     if response != 'OK':
         print("FAILED: Registration failed")
         return False
@@ -488,7 +489,7 @@ def test_12_cpu_alert_trigger():
 
     server_module.reset_state_for_tests()
 
-    response, _ = server_module.process_message("HELLO alert_cpu_1 HOST", ("127.0.0.1", 9999), protocol='TCP')
+    response, _ = server_module.process_message(f"HELLO alert_cpu_1 HOST {config.AGENT_AUTH_TOKEN}", ("127.0.0.1", 9999), protocol='TCP')
     if response != 'OK':
         print("FAILED: HELLO rejected")
         return False
@@ -518,7 +519,7 @@ def test_13_inactive_agent_alert_trigger():
 
     server_module.reset_state_for_tests()
 
-    response, _ = server_module.process_message("HELLO alert_inactive_1 HOST", ("127.0.0.1", 9998), protocol='TCP')
+    response, _ = server_module.process_message(f"HELLO alert_inactive_1 HOST {config.AGENT_AUTH_TOKEN}", ("127.0.0.1", 9998), protocol='TCP')
     if response != 'OK':
         print("FAILED: HELLO rejected")
         return False
@@ -573,7 +574,7 @@ def test_15_health_metadata_valid():
 
     server_module.reset_state_for_tests()
 
-    response, _ = server_module.process_message("HELLO health_agent_1 HOST", ("127.0.0.1", 9996), protocol='TCP')
+    response, _ = server_module.process_message(f"HELLO health_agent_1 HOST {config.AGENT_AUTH_TOKEN}", ("127.0.0.1", 9996), protocol='TCP')
     if response != 'OK':
         print("FAILED: HELLO rejected")
         return False
@@ -609,7 +610,7 @@ def test_16_health_metadata_malformed():
 
     server_module.reset_state_for_tests()
 
-    response, _ = server_module.process_message("HELLO health_agent_2 HOST", ("127.0.0.1", 9995), protocol='TCP')
+    response, _ = server_module.process_message(f"HELLO health_agent_2 HOST {config.AGENT_AUTH_TOKEN}", ("127.0.0.1", 9995), protocol='TCP')
     if response != 'OK':
         print("FAILED: HELLO rejected")
         return False

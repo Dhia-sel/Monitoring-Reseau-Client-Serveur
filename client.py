@@ -9,6 +9,8 @@ import subprocess
 import ctypes
 from datetime import datetime
 
+import config
+
 # Server configuration
 HOST = '127.0.0.1'
 PORT = 5051
@@ -289,7 +291,7 @@ def main():
             print("Connected to server\n")
         
         # Send HELLO message
-        hello_msg = f"HELLO {agent_id} {hostname}"
+        hello_msg = f"HELLO {agent_id} {hostname} {config.AGENT_AUTH_TOKEN}"
         if protocol == 'UDP':
             response = send_message_udp(client_socket, hello_msg)
         else:
