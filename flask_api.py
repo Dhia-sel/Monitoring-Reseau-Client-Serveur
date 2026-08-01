@@ -3,9 +3,10 @@ import socket
 import threading
 import time
 from datetime import datetime
-
+from events_store import read_events, summarize_events
 from flask import Flask, jsonify, render_template, request
-
+from flask import Response
+from events_store import read_events, summarize_events, format_report
 import server as server_state
 
 app = Flask(__name__)
@@ -117,7 +118,31 @@ def api_alerts():
     limit = max(1, min(200, limit))
     return jsonify(build_snapshot(alert_limit=limit)["alerts"])
 
+@app.route("/history")
+def history():
+    return render_template("history.html")
 
+@app.route("/api/events", methods=["GET"])
+def api_events():
+    events = read_events(
+        since=request.args.get("since"),
+        until=request.args.get("until"),
+        event_type=request.args.get("type"),
+        agent_id=request.args.get("agent_id"),
+        severity=request.args.get("severity"),
+    )
+    return jsonify({"events": list(reversed(events)), "summary": summarize_events(events)})
+
+@app.route("/api/report", methods=["GET"])
+def api_report():
+    events = read_events(since=request.args.get("since"), until=request.args.get("until"))
+    summary = summarize_events(events)
+    report = format_report(events, summary)
+    return Response(
+        report,
+        mimetype="text/markdown",
+        headers={"Content-Disposition": "attachment; filename=security_report.md"},
+    )
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Flask API + dashboard for network monitoring TP")
     parser.add_argument("--host", default="127.0.0.1", help="Flask bind host")

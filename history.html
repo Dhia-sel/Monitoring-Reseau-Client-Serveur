@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Historique de sécurité</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; background: #0f172a; color: #e2e8f0; }
+  .controls { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+  select, input, button { padding: 0.5rem; background: #1e293b; color: #e2e8f0; border: 1px solid #334155; border-radius: 4px; }
+  button { cursor: pointer; background: #2563eb; border: none; }
+  button:hover { background: #1d4ed8; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0; }
+  .card { background: #1e293b; padding: 1rem; border-radius: 8px; }
+  .kpis { display: flex; gap: 1rem; margin-bottom: 1rem; }
+  .kpi { background: #1e293b; padding: 0.75rem 1.25rem; border-radius: 8px; text-align: center; }
+  .kpi .value { font-size: 1.5rem; font-weight: bold; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 0.5rem; border-bottom: 1px solid #334155; text-align: left; font-size: 0.9rem; }
+  th { cursor: pointer; user-select: none; }
+  th:hover { color: #60a5fa; }
+  .badge { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .sev-high { background: #7f1d1d; color: #fca5a5; }
+  .sev-medium { background: #78350f; color: #fcd34d; }
+  .sev-low { background: #1e3a5f; color: #93c5fd; }
+  .mitre { background: #312e81; color: #c7d2fe; padding: 0.1rem 0.4rem; border-radius: 4px; font-family: monospace; font-size: 0.75rem; }
+</style>
+</head>
+<body>
+<h1>Historique des événements</h1>
+
+<div class="controls">
+  <select id="type"><option value="">Tous les types</option></select>
+  <select id="severity">
+    <option value="">Toutes sévérités</option>
+    <option value="high">high</option><option value="medium">medium</option><option value="low">low</option>
+  </select>
+  <input id="agent_id" placeholder="agent_id">
+  <input id="since" type="datetime-local">
+  <input id="until" type="datetime-local">
+  <button onclick="loadEvents()">Filtrer</button>
+  <button onclick="toggleAuto()" id="autoBtn">Auto-refresh: OFF</button>
+  <button onclick="downloadReport()">Télécharger le rapport</button>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="charts">
+  <div class="card"><canvas id="typeChart"></canvas></div>
+  <div class="card"><canvas id="severityChart"></canvas></div>
+</div>
+
+<table>
+  <thead><tr>
+    <th onclick="sortBy('timestamp')">Timestamp</th>
+    <th onclick="sortBy('type')">Type</th>
+    <th onclick="sortBy('agent_id')">Agent</th>
+    <th onclick="sortBy('source_ip')">IP source</th>
+    <th onclick="sortBy('severity')">Sévérité</th>
+    <th>MITRE</th>
+  </tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+
+<script>
+let currentEvents = [];
+let sortKey = 'timestamp';
+let sortAsc = false;
+let autoTimer = null;
+let typeChart, severityChart;
+
+function buildParams() {
+  const params = new URLSearchParams();
+  for (const id of ['type', 'severity', 'agent_id', 'since', 'until']) {
+    const val = document.getElementById(id).value;
+    if (val) params.set(id, val);
+  }
+  return params;
+}
+
+async function loadEvents() {
+  const params = buildParams();
+  const res = await fetch('/api/events?' + params.toString());
+  const data = await res.json();
+  currentEvents = data.events;
+  renderTable();
+  renderKpis(data.summary);
+  renderCharts(data.summary);
+  populateTypeFilter(data.summary.by_type);
+}
+
+function populateTypeFilter(byType) {
+  const sel = document.getElementById('type');
+  const current = sel.value;
+  const existing = new Set([...sel.options].map(o => o.value));
+  Object.keys(byType).forEach(t => {
+    if (!existing.has(t)) {
+      const opt = document.createElement('option');
+      opt.value = t; opt.textContent = t;
+      sel.appendChild(opt);
+    }
+  });
+  sel.value = current;
+}
+
+function renderKpis(summary) {
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="value">${summary.total}</div><div>Total</div></div>
+    <div class="kpi"><div class="value">${summary.by_severity.high || 0}</div><div>Sévérité haute</div></div>
+    <div class="kpi"><div class="value">${Object.keys(summary.by_source_ip).length}</div><div>IPs distinctes</div></div>
+  `;
+}
+
+function renderCharts(summary) {
+  const typeCtx = document.getElementById('typeChart');
+  const sevCtx = document.getElementById('severityChart');
+
+  if (typeChart) typeChart.destroy();
+  if (severityChart) severityChart.destroy();
+
+  typeChart = new Chart(typeCtx, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(summary.by_type),
+      datasets: [{ label: 'Événements par type', data: Object.values(summary.by_type), backgroundColor: '#2563eb' }]
+    },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  severityChart = new Chart(sevCtx, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(summary.by_severity),
+      datasets: [{ data: Object.values(summary.by_severity), backgroundColor: ['#f87171', '#fbbf24', '#60a5fa'] }]
+    }
+  });
+}
+
+function sortBy(key) {
+  if (sortKey === key) { sortAsc = !sortAsc; } else { sortKey = key; sortAsc = true; }
+  renderTable();
+}
+
+function renderTable() {
+  const sorted = [...currentEvents].sort((a, b) => {
+    const av = a[sortKey] || '', bv = b[sortKey] || '';
+    return sortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+  });
+
+  document.getElementById('rows').innerHTML = sorted.map(e => `
+    <tr>
+      <td>${e.timestamp}</td>
+      <td>${e.type}</td>
+      <td>${e.agent_id || '-'}</td>
+      <td>${e.source_ip || '-'}</td>
+      <td><span class="badge sev-${e.severity}">${e.severity}</span></td>
+      <td>${e.mitre_technique ? `<span class="mitre">${e.mitre_technique}</span>` : '-'}</td>
+    </tr>`).join('');
+}
+
+function toggleAuto() {
+  const btn = document.getElementById('autoBtn');
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+    btn.textContent = 'Auto-refresh: OFF';
+  } else {
+    autoTimer = setInterval(loadEvents, 5000);
+    btn.textContent = 'Auto-refresh: ON';
+  }
+}
+
+function downloadReport() {
+  const params = buildParams();
+  window.location.href = '/api/report?' + params.toString();
+}
+
+loadEvents();
+</script>
+</body>
+</html>
