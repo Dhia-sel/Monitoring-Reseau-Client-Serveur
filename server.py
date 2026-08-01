@@ -2,6 +2,7 @@ import socket
 import threading
 import time
 import csv
+import json
 from datetime import datetime
 
 import config
@@ -15,6 +16,13 @@ CPU_ALERT_THRESHOLD = 85.0
 ERROR_ALERT_THRESHOLD = 5
 ERROR_ALERT_WINDOW = 10
 ERROR_ALERT_COOLDOWN = 10
+EVENTS_FILE = 'events.jsonl'
+ALERT_SEVERITY = {
+    'AUTH_FAILURE': 'high',
+    'ERROR_STORM': 'medium',
+    'CPU_HIGH': 'medium',
+    'AGENT_INACTIVE': 'low',
+}
 
 
 agents_lock = threading.Lock()
@@ -28,22 +36,34 @@ alerts = []
 HEALTH_STATUSES = {'OK', 'DEGRADED', 'CRITICAL'}
 
 
-def record_alert(alert_type, message, agent_id=None):
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+def record_alert(alert_type, message, agent_id=None, source_ip=None):
+    now = datetime.now()
+    timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
     payload = {
         'timestamp': timestamp,
         'type': alert_type,
         'agent_id': agent_id,
         'message': message,
     }
+    event = {
+        'timestamp': now.isoformat(),
+        'agent_id': agent_id,
+        'type': alert_type,
+        'source_ip': source_ip,
+        'severity': ALERT_SEVERITY.get(alert_type, 'low'),
+    }
     with alerts_lock:
         alerts.append(payload)
+        try:
+            with open(EVENTS_FILE, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(event) + '\n')
+        except Exception as e:
+            print(f"[EVENTS] Write error: {e}")
 
     if agent_id:
         print(f"[ALERT][{alert_type}] {timestamp} | agent={agent_id} | {message}")
     else:
         print(f"[ALERT][{alert_type}] {timestamp} | {message}")
-
 
 def get_recent_alerts(limit=20):
     with alerts_lock:
@@ -91,14 +111,15 @@ def check_inactive_agents_once(now=None):
     with agents_lock:
         for agent_id, info in list(agents.items()):
             if (now - info['last_report_time']) >= ACTIVE_WINDOW:
-                removed_agents.append((agent_id, info['hostname']))
+                removed_agents.append((agent_id, info['hostname'] , info['addr']))
                 del agents[agent_id]
 
-    for agent_id, hostname in removed_agents:
+    for agent_id, hostname, addr in removed_agents:
         record_alert(
             'AGENT_INACTIVE',
             f"Agent inactive too long and removed: {hostname}",
             agent_id=agent_id,
+            source_ip=addr,
         )
         print(f"[CLEANUP] Agent inactive removed: {agent_id} ({hostname})")
 
@@ -156,6 +177,7 @@ def process_message(message, addr, protocol='TCP'):
                 'AUTH_FAILURE',
                 f"Invalid auth token presented by {addr}",
                 agent_id=agent_id,
+                source_ip=str(addr),
             )
             register_error_response()
             return 'ERROR', False
@@ -214,6 +236,7 @@ def process_message(message, addr, protocol='TCP'):
                             'CPU_HIGH',
                             f"CPU above threshold: {cpu_pct:.1f}% > {CPU_ALERT_THRESHOLD:.1f}%",
                             agent_id=agent_id,
+                            source_ip=agents[agent_id]['addr'],
                         )
                     elif not is_above_threshold and was_above_threshold:
                         agents[agent_id]['cpu_alert_active'] = False
