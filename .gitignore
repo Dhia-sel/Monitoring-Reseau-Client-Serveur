@@ -13,6 +13,7 @@ env/
 
 # Data generated at runtime
 stats_export.csv
+events.jsonl
 *.log
 
 # Environment variables / secrets
