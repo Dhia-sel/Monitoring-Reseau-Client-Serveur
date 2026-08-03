@@ -2,6 +2,7 @@ import argparse
 import socket
 import ssl
 import threading
+import time
 
 import security_core
 
@@ -9,12 +10,13 @@ BUFFER_SIZE = 4096
 SOCKET_TIMEOUT = 10
 
 
-def relay(source, destination):
+def relay(source, destination, byte_counter, counter_key):
     try:
         while True:
             data = source.recv(BUFFER_SIZE)
             if not data:
                 break
+            byte_counter[counter_key] += len(data)
             destination.sendall(data)
     except socket.timeout:
         pass
@@ -28,10 +30,25 @@ def relay(source, destination):
                 pass
 
 
+def _classify_and_close(addr_str, start_time, byte_counter, threads):
+    """Attend la fin des deux threads de relais, puis fait remonter le
+    volume total transféré et la durée au détecteur d'anomalies pour
+    distinguer une sonde de scan (0 octet, très court) d'un usage normal."""
+    for t in threads:
+        t.join()
+    duration_s = time.time() - start_time
+    total_bytes = byte_counter['client_to_target'] + byte_counter['target_to_client']
+    try:
+        security_core.register_connection_close(addr_str, total_bytes, duration_s)
+    except Exception as e:
+        print(f"[PROXY] Security check error on close (fail-open): {e}")
+
+
 def handle_connection(client_conn, addr, target_host, target_port, target_tls=False, target_tls_context=None, send_proxy_header=False):
     addr_str = str(addr)
+    start_time = time.time()
     try:
-        if security_core.is_blocked(addr_str) or security_core.register_connection_activity(addr_str):
+        if security_core.is_blocked(addr_str) or security_core.register_connection_open(addr_str):
             client_conn.close()
             return
     except Exception as e:
@@ -59,10 +76,22 @@ def handle_connection(client_conn, addr, target_host, target_port, target_tls=Fa
     except Exception as e:
         print(f"[PROXY] Could not reach target {target_host}:{target_port}: {e}")
         client_conn.close()
+        try:
+            security_core.register_connection_close(addr_str, 0, time.time() - start_time)
+        except Exception as sec_e:
+            print(f"[PROXY] Security check error on close (fail-open): {sec_e}")
         return
 
-    threading.Thread(target=relay, args=(client_conn, target_conn), daemon=True).start()
-    threading.Thread(target=relay, args=(target_conn, client_conn), daemon=True).start()
+    byte_counter = {'client_to_target': 0, 'target_to_client': 0}
+    t1 = threading.Thread(target=relay, args=(client_conn, target_conn, byte_counter, 'client_to_target'), daemon=True)
+    t2 = threading.Thread(target=relay, args=(target_conn, client_conn, byte_counter, 'target_to_client'), daemon=True)
+    t1.start()
+    t2.start()
+    threading.Thread(
+        target=_classify_and_close,
+        args=(addr_str, start_time, byte_counter, (t1, t2)),
+        daemon=True,
+    ).start()
 
 
 def build_ssl_context(cert_file, key_file):
