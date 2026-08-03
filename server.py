@@ -1,8 +1,10 @@
+import os
 import socket
 import threading
 import time
 import csv
 import json
+from collections import deque
 from datetime import datetime
 import ssl
 import config
@@ -30,12 +32,17 @@ agents_lock = threading.Lock()
 agents = {}  
 metrics_lock = threading.Lock()
 total_reports = 0
-error_timestamps = []
+error_timestamps = deque()
 last_error_alert_time = 0.0
 alerts_lock = threading.Lock()
 alerts = []
 HEALTH_STATUSES = {'OK', 'DEGRADED', 'CRITICAL'}
+
 def build_ssl_context():
+    if not os.path.exists(TLS_CERT_FILE) or not os.path.exists(TLS_KEY_FILE):
+        raise FileNotFoundError(
+            f"TLS certificate or key not found: {TLS_CERT_FILE}, {TLS_KEY_FILE}"
+        )
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(certfile=TLS_CERT_FILE, keyfile=TLS_KEY_FILE)
     return context
@@ -94,7 +101,7 @@ def register_error_response():
     with metrics_lock:
         error_timestamps.append(now)
         while error_timestamps and (now - error_timestamps[0]) > ERROR_ALERT_WINDOW:
-            error_timestamps.pop(0)
+            error_timestamps.popleft()
 
         if len(error_timestamps) >= ERROR_ALERT_THRESHOLD and (now - last_error_alert_time) >= ERROR_ALERT_COOLDOWN:
             last_error_alert_time = now
@@ -154,7 +161,7 @@ def validate_health(status, uptime_s, error_count):
     return status in HEALTH_STATUSES and uptime_s >= 0 and error_count >= 0
 
 
-def process_message(message, addr, protocol='TCP'):
+def process_message(message, addr, protocol='TCP', proxied=False):
     global total_reports
 
     message = message.strip()
@@ -162,11 +169,16 @@ def process_message(message, addr, protocol='TCP'):
         register_error_response()
         return 'ERROR', False
 
-    print(f"[{protocol} {addr}] Received: {message}")
+    print(f"[{protocol} {addr}] Received: {message} {'(proxied)' if proxied else ''}")
     tokens = message.split()
+    if not tokens:
+        register_error_response()
+        return 'ERROR', False
 
-    if message.startswith('HELLO'):
-        if len(tokens) < 4:
+    command = tokens[0].upper()
+
+    if command == 'HELLO':
+        if len(tokens) != 4:
             print(f"[{protocol} {addr}] ERROR: Malformed HELLO message")
             register_error_response()
             return 'ERROR', False
@@ -194,6 +206,7 @@ def process_message(message, addr, protocol='TCP'):
                 'ram_mb': 0.0,
                 'protocol': protocol,
                 'addr': str(addr),
+                'proxied': proxied,
                 'cpu_alert_active': False,
                 'health': {
                     'timestamp': 0,
@@ -207,8 +220,8 @@ def process_message(message, addr, protocol='TCP'):
         print(f"[{protocol} {addr}] Agent registered: {agent_id} ({hostname})")
         return 'OK', False
 
-    if message.startswith('REPORT'):
-        if len(tokens) < 5:
+    if command == 'REPORT':
+        if len(tokens) != 5:
             print(f"[{protocol} {addr}] ERROR: Malformed REPORT message")
             register_error_response()
             return 'ERROR', False
@@ -232,6 +245,7 @@ def process_message(message, addr, protocol='TCP'):
                     agents[agent_id]['ram_mb'] = ram_mb
                     agents[agent_id]['protocol'] = protocol
                     agents[agent_id]['addr'] = str(addr)
+                    agents[agent_id]['proxied'] = proxied or agents[agent_id].get('proxied', False)
 
                     is_above_threshold = cpu_pct > CPU_ALERT_THRESHOLD
                     if is_above_threshold and not was_above_threshold:
@@ -260,8 +274,8 @@ def process_message(message, addr, protocol='TCP'):
             register_error_response()
             return 'ERROR', False
 
-    if message.startswith('HEALTH'):
-        if len(tokens) < 6:
+    if command == 'HEALTH':
+        if len(tokens) != 6:
             print(f"[{protocol} {addr}] ERROR: Malformed HEALTH message")
             register_error_response()
             return 'ERROR', False
@@ -303,8 +317,8 @@ def process_message(message, addr, protocol='TCP'):
             register_error_response()
             return 'ERROR', False
 
-    if message.startswith('BYE'):
-        if len(tokens) < 2:
+    if command == 'BYE':
+        if len(tokens) != 2:
             print(f"[{protocol} {addr}] ERROR: Malformed BYE message")
             register_error_response()
             return 'ERROR', False
@@ -333,15 +347,37 @@ def is_agent_active(agent_id):
 def handle_client(conn, addr):
     try:
         buffer = ''
+        proxied = False
+        original_addr = addr
+
         while True:
             data = conn.recv(1024)
             if not data:
                 break
             buffer += data.decode('utf-8')
 
+            if not proxied and '\n' in buffer:
+                first_line, rest = buffer.split('\n', 1)
+                if first_line.startswith('PROXY '):
+                    proxy_tokens = first_line.split()
+                    if len(proxy_tokens) >= 3:
+                        try:
+                            addr = (proxy_tokens[1], int(proxy_tokens[2]))
+                            proxied = True
+                            print(f"[TCP {original_addr}] PROXY header received, original address {addr}")
+                            buffer = rest
+                        except ValueError:
+                            print(f"[TCP {original_addr}] Invalid PROXY header: {first_line}")
+                            conn.send(b"ERROR\n")
+                            return
+                    else:
+                        print(f"[TCP {original_addr}] Malformed PROXY header: {first_line}")
+                        conn.send(b"ERROR\n")
+                        return
+
             while '\n' in buffer:
                 line, buffer = buffer.split('\n', 1)
-                response, should_close = process_message(line, addr, protocol='TCP')
+                response, should_close = process_message(line, addr, protocol='TCP', proxied=proxied)
                 conn.send((response + '\n').encode('utf-8'))
                 if should_close:
                     return

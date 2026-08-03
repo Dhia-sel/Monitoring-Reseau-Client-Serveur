@@ -15,7 +15,7 @@ import config
 # Server configuration
 HOST = '127.0.0.1'
 PORT = 5051
-REPORT_INTERVAL = 10  # Send report every 10 seconds
+REPORT_INTERVAL = 10  
 SEND_HEALTH_METADATA = True
 TLS_CERT_FILE = 'server.crt'
 
@@ -35,7 +35,6 @@ def get_cpu_usage_pct():
     if system_name == 'Windows':
         return get_cpu_windows()
 
-    # Unix fallback: convert 1-minute load average to a rough CPU percentage.
     if hasattr(os, 'getloadavg'):
         load_1m = os.getloadavg()[0]
         cpu_count = os.cpu_count() or 1
@@ -263,6 +262,10 @@ def main():
     if protocol not in ('TCP', 'UDP'):
         protocol = 'TCP'
 
+    host = input(f"Server/Proxy host (default: {HOST}): ").strip() or HOST
+    port_input = input(f"Server/Proxy port (default: {PORT}): ").strip()
+    port = int(port_input) if port_input.isdigit() else PORT
+
     attack_choice = input("Enable attack simulation (massive REPORT burst)? (y/N): ").strip().lower()
     burst_count = 0
     if attack_choice == 'y':
@@ -276,21 +279,21 @@ def main():
     print(f"  Protocol: {protocol}")
     print(f"  Hostname: {hostname}")
     print(f"  Report Interval: {REPORT_INTERVAL}s")
-    print(f"  Connecting to {HOST}:{PORT}\n")
+    print(f"  Connecting to {host}:{port}\n")
     
     try:
         if protocol == 'UDP':
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             client_socket.settimeout(2)
-            client_socket.connect((HOST, PORT))
+            client_socket.connect((host, port))
             print("UDP socket ready\n")
         else:
             raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
             context.load_verify_locations(TLS_CERT_FILE)
             context.check_hostname = False
-            client_socket = context.wrap_socket(raw_socket, server_hostname=HOST)
-            client_socket.connect((HOST, PORT))
+            client_socket = context.wrap_socket(raw_socket, server_hostname=host)
+            client_socket.connect((host, port))
             print("Connected to server\n")
         
         hello_msg = f"HELLO {agent_id} {hostname} {config.AGENT_AUTH_TOKEN}"
@@ -335,8 +338,8 @@ def main():
             print(f"Unregistration error: {response}")
     
     except ConnectionRefusedError:
-        print(f"Error: Could not connect to server at {HOST}:{PORT}")
-        print("Make sure the server is running")
+        print(f"Error: Could not connect to server at {host}:{port}")
+        print("Make sure the server or proxy is running")
     except Exception as e:
         print(f"Error: {e}")
     
