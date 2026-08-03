@@ -1,8 +1,11 @@
 import socket
+import ssl
 import time
 import uuid
 import config
 import server as server_module
+
+TLS_CERT_FILE = 'server.crt'
 
 
 class TestClient:
@@ -20,7 +23,12 @@ class TestClient:
                 self.sock.settimeout(2)
                 self.sock.connect((self.host, self.port))
             else:
-                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_REQUIRED
+                context.load_verify_locations(TLS_CERT_FILE)
+                self.sock = context.wrap_socket(raw_sock, server_hostname=self.host)
                 self.sock.connect((self.host, self.port))
             return True
         except Exception as e:

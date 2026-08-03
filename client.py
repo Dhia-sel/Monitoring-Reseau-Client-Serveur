@@ -4,6 +4,7 @@ import time
 import uuid
 import os
 import re
+import ssl
 import platform
 import subprocess
 import ctypes
@@ -16,7 +17,7 @@ HOST = '127.0.0.1'
 PORT = 5051
 REPORT_INTERVAL = 10  # Send report every 10 seconds
 SEND_HEALTH_METADATA = True
-
+TLS_CERT_FILE = 'server.crt'
 
 def get_system_metrics():
     try:
@@ -256,8 +257,6 @@ def run_attack_mode(sock, agent_id, protocol, burst_count):
 
 
 def main():
-    """Main client function."""
-    # Get agent configuration
     generated_uuid = str(uuid.uuid4())
     agent_id = input(f"Enter agent ID (default UUID: {generated_uuid}): ").strip() or generated_uuid
     protocol = input("Protocol TCP or UDP? (default: TCP): ").strip().upper() or 'TCP'
@@ -286,11 +285,14 @@ def main():
             client_socket.connect((HOST, PORT))
             print("UDP socket ready\n")
         else:
-            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            context.load_verify_locations(TLS_CERT_FILE)
+            context.check_hostname = False
+            client_socket = context.wrap_socket(raw_socket, server_hostname=HOST)
             client_socket.connect((HOST, PORT))
             print("Connected to server\n")
         
-        # Send HELLO message
         hello_msg = f"HELLO {agent_id} {hostname} {config.AGENT_AUTH_TOKEN}"
         if protocol == 'UDP':
             response = send_message_udp(client_socket, hello_msg)

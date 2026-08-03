@@ -4,7 +4,7 @@ import time
 import csv
 import json
 from datetime import datetime
-
+import ssl
 import config
 
 HOST = '127.0.0.1'
@@ -23,7 +23,8 @@ ALERT_SEVERITY = {
     'CPU_HIGH': 'medium',
     'AGENT_INACTIVE': 'low',
 }
-
+TLS_CERT_FILE = 'server.crt'
+TLS_KEY_FILE = 'server.key'
 
 agents_lock = threading.Lock()
 agents = {}  
@@ -34,7 +35,10 @@ last_error_alert_time = 0.0
 alerts_lock = threading.Lock()
 alerts = []
 HEALTH_STATUSES = {'OK', 'DEGRADED', 'CRITICAL'}
-
+def build_ssl_context():
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(certfile=TLS_CERT_FILE, keyfile=TLS_KEY_FILE)
+    return context
 
 def record_alert(alert_type, message, agent_id=None, source_ip=None):
     now = datetime.now()
@@ -416,6 +420,7 @@ def statistics_thread():
 
 
 def main():
+    ssl_context = build_ssl_context()
     tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     tcp_socket.bind((HOST, PORT))
@@ -437,8 +442,13 @@ def main():
         while True:
             conn, addr = tcp_socket.accept()
             print(f"[TCP] New connection from {addr}")
-
-            client_thread = threading.Thread(target=handle_client, args=(conn, addr), daemon=True)
+            try:
+                secure_conn = ssl_context.wrap_socket(conn, server_side=True)
+            except ssl.SSLError as e:
+                print(f"[TLS] Handshake failed with {addr}: {e}")
+                conn.close()
+                continue
+            client_thread = threading.Thread(target=handle_client, args=(secure_conn, addr), daemon=True)
             client_thread.start()
 
     except KeyboardInterrupt:
