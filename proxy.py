@@ -37,15 +37,13 @@ def handle_connection(client_conn, addr, target_host, target_port, target_tls=Fa
     except Exception as e:
         print(f"[PROXY] Security check error (fail-open): {e}")
 
-    client_conn.settimeout(SOCKET_TIMEOUT)
     try:
-        target_conn = socket.create_connection((target_host, target_port), timeout=SOCKET_TIMEOUT)
+        target_conn = socket.create_connection((target_host, target_port))
         if target_tls:
             if target_tls_context is None:
                 target_tls_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
                 target_tls_context.check_hostname = False
             target_conn = target_tls_context.wrap_socket(target_conn, server_hostname=target_host)
-        target_conn.settimeout(SOCKET_TIMEOUT)
 
         if send_proxy_header:
             try:
@@ -79,7 +77,7 @@ def main():
     parser.add_argument('--target-port', type=int, required=True)
     parser.add_argument('--tls-cert', default=None)
     parser.add_argument('--tls-key', default=None)
-    parser.add_argument('--target-tls', action='store_true', help='Use TLS when connecting to the target server')
+    parser.add_argument('--target-tls', action=argparse.BooleanOptionalAction, default=True, help='Use TLS when connecting to the target server (default: on). Use --no-target-tls to disable')
     parser.add_argument('--target-ca', default=None, help='CA certificate file to verify the target TLS server certificate')
     parser.add_argument('--proxy-header', action='store_true', help='Send a PROXY header with the original client address to the target')
     args = parser.parse_args()
