@@ -111,6 +111,31 @@ python client_simple.py
 python flask_api.py
 ```
 
+### 2.5 Lancer avec Docker
+
+1. Copier le modèle d'environnement :
+
+```bash
+copy .env.example .env
+```
+
+2. Mettre à jour les valeurs sensibles dans `.env` :
+   - `AGENT_AUTH_TOKEN`
+   - `SPLUNK_PASSWORD`
+   - `SPLUNK_HEC_TOKEN`
+
+3. Démarrer les services Docker :
+
+```bash
+docker compose up --build
+```
+
+- Le dashboard est disponible sur `http://localhost:8000`
+- Le serveur TCP/UDP est accessible sur `localhost:5051`
+- Le proxy TLS écoute sur `localhost:6000`
+
+> Le service `monitor` auto-démarre le serveur de monitoring interne via `flask_api.py`.
+
 **Terminal 2 — Agent 1 :**
 
 ```bash

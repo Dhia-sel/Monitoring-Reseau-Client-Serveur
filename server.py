@@ -9,8 +9,8 @@ from datetime import datetime
 import ssl
 import config
 
-HOST = '127.0.0.1'
-PORT = 5051
+HOST = os.getenv('SERVER_HOST', '0.0.0.0')
+PORT = int(os.getenv('SERVER_PORT', '5051'))
 ACTIVE_WINDOW = 30  
 STATS_INTERVAL = 10
 CSV_FILE = 'stats_export.csv'
