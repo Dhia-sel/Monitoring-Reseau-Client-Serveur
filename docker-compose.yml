@@ -42,3 +42,16 @@ services:
       - SPLUNK_START_ARGS=--accept-license
       - SPLUNK_PASSWORD=${SPLUNK_PASSWORD}
       - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
+
+  forwarder:
+    build: .
+    command: python splunk_forwarder.py
+    depends_on:
+      - splunk
+    environment:
+      - SPLUNK_HEC_URL=${SPLUNK_HEC_URL}
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
+      - SPLUNK_HEC_VERIFY_TLS=${SPLUNK_HEC_VERIFY_TLS}
+      - EVENTS_FILE=${EVENTS_FILE}
+    volumes:
+      - ./events.jsonl:/app/events.jsonl

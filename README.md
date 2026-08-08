@@ -133,8 +133,14 @@ docker compose up --build
 - Le dashboard est disponible sur `http://localhost:8000`
 - Le serveur TCP/UDP est accessible sur `localhost:5051`
 - Le proxy TLS écoute sur `localhost:6000`
+- Splunk Web est accessible sur `http://localhost:8001`
+- Splunk HEC est accessible sur `https://localhost:8088`
+
+> Si `SPLUNK_HEC_TOKEN` n'est pas généré automatiquement par l'image Splunk, crée un token HEC dans l'interface Splunk et place-le dans `.env`.
 
 > Le service `monitor` auto-démarre le serveur de monitoring interne via `flask_api.py`.
+
+> Le service `forwarder` lit `events.jsonl` et tente d'envoyer les événements vers Splunk HEC.
 
 **Terminal 2 — Agent 1 :**
 
