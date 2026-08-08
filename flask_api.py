@@ -3,10 +3,9 @@ import socket
 import threading
 import time
 from datetime import datetime
-from events_store import read_events, summarize_events
+from events_store import read_events, summarize_events, format_report
 from flask import Flask, jsonify, render_template, request
 from flask import Response
-from events_store import read_events, summarize_events, format_report
 import server as server_state
 
 app = Flask(__name__)
@@ -22,7 +21,8 @@ def maybe_start_monitor_server(auto_start):
     if not auto_start:
         return
 
-    if is_port_open(server_state.HOST, server_state.PORT):
+    probe_host = '127.0.0.1' if server_state.HOST == '0.0.0.0' else server_state.HOST
+    if is_port_open(probe_host, server_state.PORT):
         print(
             f"[flask_api] Monitoring server already running on "
             f"{server_state.HOST}:{server_state.PORT}, reusing shared module state in this process only."

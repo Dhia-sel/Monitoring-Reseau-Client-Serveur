@@ -1,0 +1,44 @@
+services:
+  monitor:
+    build: .
+    command: python flask_api.py --host 0.0.0.0
+    ports:
+      - "5051:5051"
+      - "5051:5051/udp"
+      - "8000:8000"
+    environment:
+      - AGENT_AUTH_TOKEN=${AGENT_AUTH_TOKEN}
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=5051
+    volumes:
+      - ./server.crt:/app/server.crt
+      - ./server.key:/app/server.key
+      - ./events.jsonl:/app/events.jsonl
+      - ./server.py:/app/server.py
+
+  proxy:
+    build: .
+    command: >
+      python proxy.py --listen-host 0.0.0.0 --listen-port 6000
+      --target-host monitor --target-port 5051
+      --tls-cert server.crt --tls-key server.key
+    ports:
+      - "6000:6000"
+    volumes:
+      - ./server.crt:/app/server.crt
+      - ./server.key:/app/server.key
+      - ./events.jsonl:/app/events.jsonl
+    depends_on:
+      - monitor
+
+  splunk:
+    image: splunk/splunk:latest
+    container_name: splunk-dev
+    ports:
+      - "8001:8000"
+      - "8088:8088"
+    environment:
+      - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
+      - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD}
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
